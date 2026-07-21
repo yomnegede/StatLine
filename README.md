@@ -1,4 +1,4 @@
-# HoopIQ
+# StatLine
 
 An NBA RAG (retrieval-augmented generation) app — ask natural-language questions about NBA players and get answers grounded in real stats, not hallucinated.
 
