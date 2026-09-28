@@ -821,7 +821,7 @@ export default function Home() {
                 <tr>
                   <th scope="col">
                     <button type="button" onClick={() => setSort("name")}>
-                      PLAYER {sort === "name" && "↓"}
+                      PLAYER {sort === "name" && "↑"}
                     </button>
                   </th>
                   {(
