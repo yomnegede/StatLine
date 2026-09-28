@@ -18,7 +18,7 @@ import pandas as pd
 import psycopg2
 import voyageai
 from dotenv import load_dotenv
-from nba_api.stats.endpoints import playergamelog
+from nba_api.stats.endpoints import leagueleaders, playergamelog
 from nba_api.stats.static import players
 from pgvector import Vector
 from pgvector.psycopg2 import register_vector
@@ -48,6 +48,26 @@ def load_watchlist(path: Path) -> list[str]:
     if len(set(names)) != len(names):
         raise ValueError("Watchlist contains duplicate names")
     return names
+
+
+def top_scorer_names(season: str, count: int = 16, allow_fallback: bool = True) -> tuple[str, list[str]]:
+    """Select the NBA's season PPG leaders instead of a hard-coded app watchlist."""
+    seasons = [season, previous_season(season)] if allow_fallback else [season]
+    for candidate in seasons:
+        board = leagueleaders.LeagueLeaders(
+            per_mode48="PerGame", scope="S", season=candidate,
+            season_type_all_star="Regular Season", stat_category_abbreviation="PTS", timeout=25,
+        ).get_data_frames()[0]
+        if board.empty:
+            continue
+        names = []
+        for player_id in board.sort_values("PTS", ascending=False)["PLAYER_ID"].head(count):
+            player = players.find_player_by_id(int(player_id))
+            if player:
+                names.append(player["full_name"])
+        if names:
+            return candidate, names
+    raise ValueError(f"No NBA scoring leaders found for {', '.join(seasons)}")
 
 
 def player_id_for(name: str) -> int:
@@ -154,16 +174,22 @@ def store_chunks(chunks: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh StatLine player summaries")
-    parser.add_argument("--watchlist", type=Path, default=DEFAULT_WATCHLIST)
+    parser.add_argument("--watchlist", type=Path, help="Optional manual player list; defaults to top 16 season PPG leaders")
     parser.add_argument("--season", help="NBA season such as 2025-26; defaults to current season with fallback")
     parser.add_argument("--player", action="append", help="Refresh one named player; repeat for more")
     parser.add_argument("--dry-run", action="store_true", help="Fetch and summarize without embedding or storing")
     args = parser.parse_args()
 
-    names = args.player or load_watchlist(args.watchlist)
     season = args.season or season_for_day(datetime.now(timezone.utc).date())
     if not re.fullmatch(r"20\d{2}-\d{2}", season):
         parser.error("--season must look like 2025-26")
+    if args.player:
+        names = args.player
+    elif args.watchlist:
+        names = load_watchlist(args.watchlist)
+    else:
+        season, names = top_scorer_names(season, allow_fallback=args.season is None)
+        print(f"Using {season} regular-season PPG leaders: {', '.join(names)}")
     chunks, failures = prepare_chunks(names, season, allow_fallback=args.season is None)
     if chunks and not args.dry_run:
         load_dotenv(ROOT / ".env")

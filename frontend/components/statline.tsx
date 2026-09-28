@@ -22,7 +22,11 @@ export type Player = {
   field_goal_pct: number;
   games: RecentGame[];
   source_id: string;
+  rank: number | null;
+  season_ppg: number | null;
+  season_games: number | null;
 };
+export type PlayerOption = { id: number; name: string; active: boolean };
 export type Source = {
   id: string;
   player: string;

@@ -25,6 +25,9 @@ class PlayerSummary(BaseModel):
     field_goal_pct: float
     games: list[RecentGame]
     source_id: str
+    rank: int | None = None
+    season_ppg: float | None = None
+    season_games: int | None = None
 
 
 SUMMARY_PATTERN = re.compile(

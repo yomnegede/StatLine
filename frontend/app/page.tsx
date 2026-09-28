@@ -16,6 +16,7 @@ import {
   metricLabels,
   Metric,
   Player,
+  PlayerOption,
   PlayerAvatar,
   SectionLabel,
   Source,
@@ -25,8 +26,8 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const examples = [
-  "Who is scoring the most over the last five games?",
-  "Compare Jayson Tatum and Devin Booker recently.",
+  "Who leads the NBA in points per game this season?",
+  "Compare Jaylen Brown and Devin Booker recently.",
   "How has Anthony Edwards played in his last five games?",
 ];
 const loadingSteps = [
@@ -34,7 +35,13 @@ const loadingSteps = [
   "Reading recent game logs",
   "Putting the numbers together",
 ];
-type Sort = "points" | "rebounds" | "assists" | "field_goal_pct" | "name";
+type Sort =
+  | "season_ppg"
+  | "points"
+  | "rebounds"
+  | "assists"
+  | "field_goal_pct"
+  | "name";
 
 function QueryInput({
   question,
@@ -68,11 +75,11 @@ function QueryInput({
         onKeyDown={onKeyDown}
         maxLength={500}
         rows={2}
-        placeholder="Ask a question about the players and games we have loaded…"
+        placeholder="Ask about any NBA player or recent performance…"
       />
       <div className="query-bottom">
         <span>
-          Recent NBA game logs · Enter to ask · Shift + Enter for a new line
+          NBA regular-season data · Enter to ask · Shift + Enter for a new line
         </span>
         <button
           className="primary-button"
@@ -122,6 +129,29 @@ function CitationText({
   );
 }
 
+type AnswerStat = Pick<
+  Player,
+  "id" | "name" | "games_count" | "points" | "rebounds" | "assists"
+>;
+
+function statsFromSource(source: Source, players: Player[]): AnswerStat | null {
+  const loaded = players.find((player) => player.source_id === source.id);
+  if (loaded) return loaded;
+  const match = source.content.match(
+    /last (\d+) games .*?averaging (\d+(?:\.\d+)?) pts, (\d+(?:\.\d+)?) reb, (\d+(?:\.\d+)?) ast/,
+  );
+  return match
+    ? {
+        id: source.id,
+        name: source.player,
+        games_count: Number(match[1]),
+        points: Number(match[2]),
+        rebounds: Number(match[3]),
+        assists: Number(match[4]),
+      }
+    : null;
+}
+
 function AnswerPanel({
   result,
   players,
@@ -145,8 +175,8 @@ function AnswerPanel({
     (source) => !primarySources.some((primary) => primary.id === source.id),
   );
   const matched = primarySources
-    .map((source) => players.find((player) => player.source_id === source.id))
-    .filter((player): player is Player => Boolean(player))
+    .map((source) => statsFromSource(source, players))
+    .filter((player): player is AnswerStat => Boolean(player))
     .slice(0, 3);
   const paragraphs =
     result.answer
@@ -324,10 +354,12 @@ function PlayerDrawer({
   player,
   onClose,
   onAsk,
+  onCompare,
 }: {
   player: Player;
   onClose: () => void;
   onAsk: (question: string) => void;
+  onCompare: (player: Player) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
@@ -476,6 +508,13 @@ function PlayerDrawer({
           Ask about {player.name.split(" ").at(-1)}{" "}
           <Icon name="arrow" size={16} />
         </button>
+        <button
+          className="drawer-compare"
+          type="button"
+          onClick={() => onCompare(player)}
+        >
+          Add to comparison <Icon name="plus" size={16} />
+        </button>
         <p className="source-footnote">
           Source: NBA PlayerGameLog · {player.first_game}–{player.last_game}
         </p>
@@ -488,6 +527,7 @@ export default function Home() {
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<AskResponse | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [otherPlayers, setOtherPlayers] = useState<Player[]>([]);
   const [dataState, setDataState] = useState<"loading" | "ready" | "error">(
     "loading",
   );
@@ -495,7 +535,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<Sort>("points");
+  const [searchOptions, setSearchOptions] = useState<PlayerOption[]>([]);
+  const [searchState, setSearchState] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [sort, setSort] = useState<Sort>("season_ppg");
   const [selected, setSelected] = useState<string[]>([]);
   const [detail, setDetail] = useState<Player | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -531,6 +575,56 @@ export default function Home() {
     );
     return () => window.clearInterval(timer);
   }, [loading]);
+  useEffect(() => {
+    if (search.trim().length < 2) {
+      setSearchOptions([]);
+      setSearchState("idle");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`${API_URL}/player-search?q=${encodeURIComponent(search.trim())}`, {
+        signal: controller.signal,
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Search unavailable");
+          return response.json();
+        })
+        .then((options: PlayerOption[]) => {
+          setSearchOptions(options);
+          setSearchState("ready");
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setSearchState("error");
+        });
+    }, 180);
+    setSearchState("loading");
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
+  async function openPlayer(option: PlayerOption) {
+    setSearch("");
+    try {
+      const response = await fetch(`${API_URL}/players/${option.id}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? "Player data unavailable");
+      }
+      const player = (await response.json()) as Player;
+      setOtherPlayers((current) =>
+        current.some((item) => item.id === player.id)
+          ? current
+          : [...current, player],
+      );
+      setDetail(player);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Player data unavailable",
+      );
+    }
+  }
   async function ask(event?: FormEvent<HTMLFormElement>, prompt?: string) {
     event?.preventDefault();
     const text = (prompt ?? questionRef.current).trim();
@@ -583,21 +677,24 @@ export default function Home() {
   }
   const visiblePlayers = useMemo(
     () =>
-      [...players]
-        .filter((player) =>
-          player.name.toLowerCase().includes(search.toLowerCase()),
-        )
-        .sort((a, b) =>
-          sort === "name" ? a.name.localeCompare(b.name) : b[sort] - a[sort],
-        ),
-    [players, search, sort],
+      [...players].sort((a, b) =>
+        sort === "name"
+          ? a.name.localeCompare(b.name)
+          : (b[sort] ?? -1) - (a[sort] ?? -1),
+      ),
+    [players, sort],
   );
   const leaders = useMemo(
-    () => [...players].sort((a, b) => b.points - a.points).slice(0, 3),
+    () =>
+      [...players]
+        .sort((a, b) => (b.season_ppg ?? 0) - (a.season_ppg ?? 0))
+        .slice(0, 3),
     [players],
   );
   const compared = selected
-    .map((id) => players.find((player) => player.id === id))
+    .map((id) =>
+      [...players, ...otherPlayers].find((player) => player.id === id),
+    )
     .filter((player): player is Player => Boolean(player));
   const season = players[0]?.season ?? "NBA";
   return (
@@ -646,8 +743,8 @@ export default function Home() {
               <span>The whole story.</span>
             </h1>
             <p>
-              Ask about the players in our watchlist. Get clear answers backed
-              by recent game logs, then go straight to the source.
+              Ask about any NBA player. Get clear answers backed by game logs,
+              then go straight to the source.
             </p>
           </div>
           <div className="hero-index" aria-hidden="true">
@@ -693,8 +790,7 @@ export default function Home() {
               <Icon name="spark" size={17} />
               <strong>{loadingSteps[loadingStep]}…</strong>
               <span>
-                Checking the loaded player summaries and preparing a sourced
-                answer.
+                Checking NBA game logs and preparing a sourced answer.
               </span>
             </div>
           </div>
@@ -712,7 +808,7 @@ export default function Home() {
           <AnswerPanel
             key={question}
             result={result}
-            players={players}
+            players={[...players, ...otherPlayers]}
             askFollowup={usePrompt}
           />
         )}
@@ -721,27 +817,26 @@ export default function Home() {
             number={result ? "02" : "01"}
             aside={
               players.length
-                ? `UPDATED THROUGH ${new Date(Math.max(...players.map((player) => Date.parse(`${player.last_game}T12:00:00`)))).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase()}`
-                : "LOADED PLAYER DATA"
+                ? `${season} REGULAR SEASON · NBA LEAGUELEADERS`
+                : "LOADING SCORING DATA"
             }
           >
-            WATCHLIST PULSE
+            SCORING LEADERS
           </SectionLabel>
           <div className="pulse-layout">
             <div className="pulse-intro">
               <span className="eyebrow">A QUICK READ</span>
               <h2 id="pulse-title">
-                Recent form,
+                The league’s,
                 <br />
-                <em>at a glance.</em>
+                <em>top scorers.</em>
               </h2>
               <p>
-                Scoring leaders among the players currently loaded into
-                StatLine. Averages cover each player’s latest five regular
-                season games.
+                Recommended players ranked by {season} regular-season points per
+                game. Open a player to see their last five games.
               </p>
               <a href="#players" className="text-link">
-                Explore the watchlist <Icon name="arrow" size={17} />
+                Explore the leaders <Icon name="arrow" size={17} />
               </a>
             </div>
             <div className="leaders-list">
@@ -757,16 +852,16 @@ export default function Home() {
                       onClick={() => setDetail(player)}
                     >
                       <span className="leader-rank">
-                        {String(index + 1).padStart(2, "0")}
+                        {String(player.rank ?? index + 1).padStart(2, "0")}
                       </span>
                       <PlayerAvatar name={player.name} />
                       <span className="leader-identity">
                         <strong>{player.name}</strong>
-                        <small>LAST {player.games_count} GAMES</small>
+                        <small>{player.season_games} SEASON GAMES</small>
                       </span>
                       <span className="leader-points">
-                        <strong>{player.points.toFixed(1)}</strong>
-                        <small>PTS / GAME</small>
+                        <strong>{player.season_ppg?.toFixed(1)}</strong>
+                        <small>SEASON PPG</small>
                       </span>
                       <Icon name="arrow" size={17} />
                     </button>
@@ -792,28 +887,62 @@ export default function Home() {
         >
           <SectionLabel
             number={result ? "03" : "02"}
-            aside={`${players.length} PLAYERS LOADED`}
+            aside={`${players.length} RECOMMENDED PLAYERS`}
           >
-            PLAYER INDEX
+            PLAYER DISCOVERY
           </SectionLabel>
           <div className="section-title-row">
             <div>
-              <span className="eyebrow">THE CURRENT WATCHLIST</span>
+              <span className="eyebrow">RECOMMENDED BY SEASON PPG</span>
               <h2 id="players-title">Explore the players.</h2>
               <p>
-                Recent averages and game logs from the same data behind every
-                answer.
+                The scoring leaders are a starting point. Search for any NBA
+                player to open their recent game log.
               </p>
             </div>
-            <label className="player-search">
-              <Icon name="search" size={18} />
-              <span className="sr-only">Find a player</span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Find a player"
-              />
-            </label>
+            <div className="player-search-wrap">
+              <label className="player-search">
+                <Icon name="search" size={18} />
+                <span className="sr-only">Search all NBA players</span>
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search any player"
+                  autoComplete="off"
+                />
+              </label>
+              {search.trim().length >= 2 && (
+                <div
+                  className="search-results"
+                  role="region"
+                  aria-label="Player search results"
+                >
+                  {searchState === "loading" && <p>Searching NBA players…</p>}
+                  {searchState === "error" && (
+                    <p>Player search is unavailable.</p>
+                  )}
+                  {searchState === "ready" && searchOptions.length === 0 && (
+                    <p>No NBA players found.</p>
+                  )}
+                  {searchOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => openPlayer(option)}
+                    >
+                      <PlayerAvatar name={option.name} />
+                      <span>
+                        {option.name}
+                        <small>
+                          {option.active ? "ACTIVE PLAYER" : "FORMER PLAYER"}
+                        </small>
+                      </span>
+                      <Icon name="arrow" size={15} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="table-wrap">
             <table className="players-table">
@@ -822,6 +951,11 @@ export default function Home() {
                   <th scope="col">
                     <button type="button" onClick={() => setSort("name")}>
                       PLAYER {sort === "name" && "↑"}
+                    </button>
+                  </th>
+                  <th scope="col">
+                    <button type="button" onClick={() => setSort("season_ppg")}>
+                      SEASON PPG {sort === "season_ppg" && "↓"}
                     </button>
                   </th>
                   {(
@@ -834,7 +968,10 @@ export default function Home() {
                   ).map((metric) => (
                     <th key={metric} scope="col">
                       <button type="button" onClick={() => setSort(metric)}>
-                        {metricLabels[metric]} {sort === metric && "↓"}
+                        {metric === "points"
+                          ? "LAST 5 PTS"
+                          : metricLabels[metric]}{" "}
+                        {sort === metric && "↓"}
                       </button>
                     </th>
                   ))}
@@ -856,12 +993,15 @@ export default function Home() {
                         <span>
                           <strong>{player.name}</strong>
                           <small>
-                            {player.season} · LAST {player.games_count}
+                            #{player.rank} · {player.season_games} GP
                           </small>
                         </span>
                       </button>
                     </th>
-                    <td className="emphasis">{player.points.toFixed(1)}</td>
+                    <td className="emphasis">
+                      {player.season_ppg?.toFixed(1)}
+                    </td>
+                    <td>{player.points.toFixed(1)}</td>
                     <td>{player.rebounds.toFixed(1)}</td>
                     <td>{player.assists.toFixed(1)}</td>
                     <td>{player.field_goal_pct.toFixed(1)}%</td>
@@ -885,7 +1025,7 @@ export default function Home() {
               </tbody>
             </table>
             {dataState === "ready" && visiblePlayers.length === 0 && (
-              <p className="empty-table">No players match “{search}”.</p>
+              <p className="empty-table">No scoring leaders are available.</p>
             )}
             {dataState === "loading" && (
               <p className="empty-table">Loading the player index…</p>
@@ -897,8 +1037,9 @@ export default function Home() {
             )}
           </div>
           <p className="table-note">
-            Averages from each player’s latest {players[0]?.games_count ?? 5}{" "}
-            loaded regular season games. Select two players to compare.
+            Season PPG and games played come from the NBA scoring leaderboard.
+            Other statistics are averages from each player’s latest five
+            regular-season games.
           </p>
         </section>
         <section
@@ -914,8 +1055,8 @@ export default function Home() {
               <span className="eyebrow">TWO PLAYERS. SAME WINDOW.</span>
               <h2 id="compare-title">See the difference.</h2>
               <p>
-                Compare the recent numbers that matter. Choose any two players
-                from the index above.
+                Compare recent numbers for two players from the leaders or
+                all-player search.
               </p>
             </div>
             {compared.length > 0 && (
@@ -951,7 +1092,7 @@ export default function Home() {
               <p>
                 {compared.length === 1
                   ? `${compared[0].name} is ready. Add another player from the index.`
-                  : "Use the + controls in the player index to build a side-by-side comparison."}
+                  : "Use the + controls above or search any player to build a comparison."}
               </p>
               <a href="#players" className="text-link">
                 Browse players <Icon name="arrow" size={16} />
@@ -1038,14 +1179,25 @@ export default function Home() {
               {season} regular season · {players.length || "loaded"} player
               summaries
               <br />
-              Source: NBA PlayerGameLog
+              Sources: NBA LeagueLeaders and regular-season game logs
             </p>
           </div>
           <a href="#top">BACK TO TOP ↑</a>
         </div>
       </footer>
       {detail && (
-        <PlayerDrawer player={detail} onClose={closeDetail} onAsk={usePrompt} />
+        <PlayerDrawer
+          player={detail}
+          onClose={closeDetail}
+          onAsk={usePrompt}
+          onCompare={(player) => {
+            toggleCompare(player.id);
+            closeDetail();
+            document
+              .getElementById("compare")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
       )}
     </div>
   );
