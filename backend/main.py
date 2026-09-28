@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from utils.llm_client import generate_answer
 from utils.retrieval import select_named_sources
+from backend.player_data import PlayerSummary, parse_player_summary
 
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -23,7 +24,10 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 app = FastAPI(title="StatLine API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:3001", "http://127.0.0.1:3001",
+    ],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
@@ -94,6 +98,20 @@ def health():
     except Exception as error:
         raise HTTPException(status_code=503, detail="Database is unavailable") from error
     return {"status": "ok", "chunks": count}
+
+
+@app.get("/players", response_model=list[PlayerSummary])
+def players():
+    """Expose the same loaded summaries used by /ask for browsing and comparison."""
+    try:
+        with closing(get_connection()) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("select id, player, content from public.nba_chunks order by player")
+                rows = cursor.fetchall()
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Player data is unavailable") from error
+    return [summary for source_id, name, content in rows
+            if (summary := parse_player_summary(source_id, name, content)) is not None]
 
 
 @app.post("/ask", response_model=AskResponse)
