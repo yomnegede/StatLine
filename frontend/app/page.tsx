@@ -175,6 +175,7 @@ function AnswerPanel({
     <section
       className="answer-section"
       id="answer"
+      aria-live="polite"
       aria-labelledby="answer-heading"
     >
       <SectionLabel
