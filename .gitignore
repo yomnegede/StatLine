@@ -7,3 +7,7 @@ node_modules/
 .next/
 .venv/
 venv/
+
+.DS_Store
+*.tsbuildinfo
+HANDOFF.local.md
