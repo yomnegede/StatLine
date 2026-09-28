@@ -721,7 +721,7 @@ export default function Home() {
             number={result ? "02" : "01"}
             aside={
               players.length
-                ? `UPDATED THROUGH ${new Date(Math.max(...players.map((player) => Date.parse(player.last_game)))).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase()}`
+                ? `UPDATED THROUGH ${new Date(Math.max(...players.map((player) => Date.parse(`${player.last_game}T12:00:00`)))).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase()}`
                 : "LOADED PLAYER DATA"
             }
           >
