@@ -7,6 +7,8 @@ questions. OpenAI turns those sources into cited answers. The existing Voyage
 AI + Supabase pgvector path remains available for semantic retrieval. The
 Next.js experience lets fans inspect citations, search NBA players, browse
 recommended scorers, open player profiles, and compare recent performances.
+The proposed game-level query architecture is in
+[`docs/STAT_QUERY_ARCHITECTURE.md`](docs/STAT_QUERY_ARCHITECTURE.md).
 
 ## Current scope
 
