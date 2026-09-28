@@ -4,8 +4,9 @@ StatLine answers NBA stats questions using game logs as evidence. A repeatable
 ingestion command fetches player game logs through `nba_api`, summarizes each
 player's latest five games, embeds the summaries with Voyage AI, and stores
 them in Supabase Postgres with pgvector. FastAPI retrieves relevant summaries
-and asks OpenAI to answer with source IDs. A Next.js page displays the answer
-and its underlying stats.
+and asks OpenAI to answer with source IDs. The Next.js experience lets fans ask
+questions, inspect cited game logs, browse the watchlist, open player profiles,
+and compare recent performances side by side.
 
 ## Current scope
 
@@ -51,6 +52,8 @@ August 1, 2026 target in `ROADMAP.md` is historical.
 Open [http://localhost:3000](http://localhost:3000). The API health check is at
 `http://127.0.0.1:8000/health`. The page calls the API at `http://localhost:8000`
 by default; set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` if needed.
+The read-only `GET /players` endpoint serves structured data from the same
+loaded summaries used by `POST /ask`; it does not need a database migration.
 
 ## Refresh data
 

@@ -4,6 +4,7 @@ from datetime import date
 import pandas as pd
 
 from backend.ingest import chunk_for, previous_season, season_for_day
+from backend.player_data import parse_player_summary
 from utils.retrieval import select_named_sources
 
 
@@ -35,6 +36,23 @@ class IngestTests(unittest.TestCase):
         ]
         selected = select_named_sources("Compare Tatum and Booker", sources)
         self.assertEqual([row["player"] for row in selected], ["Devin Booker", "Jayson Tatum"])
+
+    def test_ingested_summary_powers_player_view(self):
+        games = pd.DataFrame(
+            [
+                {"GAME_DATE": "Apr 01, 2026", "MATCHUP": "AAA vs. BBB", "PTS": 10, "REB": 2, "AST": 3, "FGM": 1, "FGA": 2},
+                {"GAME_DATE": "Apr 03, 2026", "MATCHUP": "AAA @ CCC", "PTS": 20, "REB": 4, "AST": 5, "FGM": 3, "FGA": 10},
+            ]
+        )
+        chunk = chunk_for("Test Player", "2025-26", games)
+        player = parse_player_summary(chunk["id"], chunk["player"], chunk["text"])
+        self.assertIsNotNone(player)
+        assert player is not None
+        self.assertEqual(player.points, 15.0)
+        self.assertEqual(player.field_goal_pct, 33.3)
+        self.assertEqual(player.games[0].matchup, "AAA @ CCC")
+        self.assertEqual([game.points for game in player.games], [20, 10])
+        self.assertIsNone(parse_player_summary(chunk["id"], chunk["player"], "incomplete record"))
 
 
 if __name__ == "__main__":
