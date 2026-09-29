@@ -76,6 +76,41 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIn("[Source: jalen_last5]", fallback)
         self.assertFalse(uncited_stat_paragraphs(fallback))
 
+    def test_uncited_answer_with_legacy_summary_is_unavailable(self):
+        from backend.main import AskRequest, Source, ask
+
+        source = Source(
+            id="tatum_last5", player="Jayson Tatum", distance=0.0,
+            content="Jayson Tatum — last 5 games (Apr 01 to Apr 10): "
+                    "averaging 22.0 pts, 8.0 reb, 5.0 ast on 50.0% shooting from the field.",
+        )
+        with patch("backend.main.direct_sources", return_value=([source], None)), \
+             patch("backend.main.os.getenv", return_value="test-key"), \
+             patch("backend.main.generate_answer", return_value="Tatum averaged 25 points."):
+            result = ask(AskRequest(question="How has Tatum played recently?"))
+
+        self.assertEqual(result.status, "answer_unavailable")
+        self.assertIsNone(result.answer)
+        self.assertEqual(result.sources, [source])
+
+    def test_uncited_answer_uses_parseable_fallback(self):
+        from backend.main import AskRequest, Source, ask
+
+        source = Source(
+            id="tatum_last5", player="Jayson Tatum", distance=0.0,
+            content="Jayson Tatum — 2025-26 regular season, last 5 games "
+                    "(2026-04-01 to 2026-04-10, NBA PlayerGameLog): "
+                    "averaging 22.0 pts, 8.0 reb, 5.0 ast on 50.0% field-goal shooting.",
+        )
+        with patch("backend.main.direct_sources", return_value=([source], None)), \
+             patch("backend.main.os.getenv", return_value="test-key"), \
+             patch("backend.main.generate_answer", return_value="Tatum averaged 25 points."):
+            result = ask(AskRequest(question="How has Tatum played recently?"))
+
+        self.assertEqual(result.status, "answered")
+        self.assertIn("22.0 points", result.answer)
+        self.assertNotIn("25 points", result.answer)
+
 
 if __name__ == "__main__":
     unittest.main()

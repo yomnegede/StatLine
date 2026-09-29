@@ -242,6 +242,14 @@ def ask(request: AskRequest):
     cited_ids = re.findall(r"\[Source: ([^\]]+)\]", answer)
     if (uncited_stat_paragraphs(answer) or not cited_ids
             or any(cited_id not in {source.id for source in sources} for cited_id in cited_ids)):
-        answer = sourced_fallback(sources) or answer
+        fallback = sourced_fallback(sources)
+        if not fallback:
+            return AskResponse(
+                answer=None,
+                sources=sources,
+                status="answer_unavailable",
+                notice="A sourced answer could not be verified. Retrieved stats are shown below.",
+            )
+        answer = fallback
 
     return AskResponse(answer=answer, sources=sources, status="answered")
