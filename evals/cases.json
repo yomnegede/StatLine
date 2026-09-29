@@ -54,6 +54,18 @@
     "expected_players": ["Stephen Curry"]
   },
   {
+    "id": "retired_player_back_to_backs",
+    "question": "Kobe Bryant back-to-back stats since 2014",
+    "kind": "historical_b2b",
+    "expected_players": ["Kobe Bryant"]
+  },
+  {
+    "id": "unlisted_player_back_to_backs",
+    "question": "Jalen Johnson back-to-back stats since 2024",
+    "kind": "historical_b2b",
+    "expected_players": ["Jalen Johnson"]
+  },
+  {
     "id": "unsupported_defense",
     "question": "How does Jayson Tatum perform against zone defense?",
     "kind": "unsupported",
