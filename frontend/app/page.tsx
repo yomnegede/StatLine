@@ -292,7 +292,11 @@ function AnswerPanel({
                 {openSource === source.id && (
                   <div className="evidence-body">
                     <p>{source.content}</p>
-                    <code>NBA PlayerGameLog · {source.id}</code>
+                    <code>
+                      {source.id.startsWith("nba_b2b_")
+                        ? "NBA TeamGameLogs + PlayerGameLogs"
+                        : "NBA PlayerGameLog"} · {source.id}
+                    </code>
                   </div>
                 )}
               </div>
@@ -322,7 +326,11 @@ function AnswerPanel({
                     {openSource === source.id && (
                       <div className="evidence-body">
                         <p>{source.content}</p>
-                        <code>NBA PlayerGameLog · {source.id}</code>
+                        <code>
+                          {source.id.startsWith("nba_b2b_")
+                            ? "NBA TeamGameLogs + PlayerGameLogs"
+                            : "NBA PlayerGameLog"} · {source.id}
+                        </code>
                       </div>
                     )}
                   </div>

@@ -3,7 +3,9 @@
 StatLine answers NBA stats questions using game logs as evidence. FastAPI uses
 NBA regular-season game logs for named-player questions, including players
 outside the recommended list, and the NBA scoring leaderboard for season PPG
-questions. OpenAI turns those sources into cited answers. The existing Voyage
+questions. Historical second-night back-to-back questions use imported team
+and player game facts, with exact game IDs and deterministic averages. OpenAI turns
+other sources into cited answers. The existing Voyage
 AI + Supabase pgvector path remains available for semantic retrieval. The
 Next.js experience lets fans inspect citations, search NBA players, browse
 recommended scorers, open player profiles, and compare recent performances.
@@ -17,7 +19,11 @@ regular-season points-per-game leaderboard. This is a discovery list, not a
 restriction on questions: named players with NBA regular-season game logs can
 be looked up on demand, including former players. Recent profiles and answers
 use each player's latest five games from their latest available season. The
-app does not have live scores, injuries, defensive-scheme data, or every
+back-to-back route covers imported regular-season seasons from 2013-14 onward
+and defines a qualifying game as the second of two team games on consecutive
+NBA dates, when the player appeared in the second game. It reports incomplete
+season coverage instead of a partial historical average. The app does not have
+live scores, injuries, defensive-scheme data, or every
 possible split. The original August 1, 2026 target in `ROADMAP.md` is
 historical.
 
@@ -82,6 +88,26 @@ To override the recommendations for a manual import, use
 `nba_rag_starter.ipynb` remains a three-player learning notebook. The one-time table SQL is in the
 notebook, and the `public.nba_chunks` table already exists in the connected
 Supabase project.
+
+## Load historical back-to-back data
+
+The API reads private `statline` schema tables for historical second-night
+back-to-back questions. Initialize the schema and import complete regular-season
+team and player logs before using this route:
+
+```bash
+venv/bin/python -m backend.history_import --init-schema --start-season 2013-14 --end-season 2025-26
+```
+
+The importer validates team/player game coverage and replaces each season in
+one transaction. Rerun it to refresh an active season or source corrections.
+If a requested season is missing, the API declines the average and names the
+missing season. For example, ask “James Harden stats on back-to-backs starting
+from 2014.” A bare year means January 1 of that year; “since 2014-15” means
+the NBA season. The answer includes games through the latest imported season.
+This first historical route covers
+second nights only; the broader event/calendar query architecture remains in
+the design document.
 
 ## Evaluate answer quality
 
