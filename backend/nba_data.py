@@ -145,7 +145,7 @@ def season_data() -> SeasonData:
                     if attempt == 0:
                         time.sleep(1)
                         continue
-                    if _season_cache:  # Preserve known data through a temporary NBA outage.
+                    if _season_cache and _season_cache[1].season == candidate:  # Preserve known data through a temporary NBA outage.
                         return _season_cache[1]
                     raise RuntimeError("NBA season data is unavailable") from error
             if data:
