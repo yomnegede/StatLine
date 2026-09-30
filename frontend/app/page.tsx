@@ -598,6 +598,7 @@ export default function Home() {
           if (!controller.signal.aborted) setSearchState("error");
         });
     }, 180);
+    setSearchOptions([]);
     setSearchState("loading");
     return () => {
       window.clearTimeout(timer);
