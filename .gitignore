@@ -11,3 +11,4 @@ venv/
 .DS_Store
 *.tsbuildinfo
 HANDOFF.local.md
+evals/runs/

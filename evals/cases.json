@@ -1,0 +1,56 @@
+[
+  {
+    "id": "unlisted_player",
+    "question": "How many points per game did Jalen Johnson average over his last five regular-season games?",
+    "kind": "named_average",
+    "expected_players": ["Jalen Johnson"]
+  },
+  {
+    "id": "another_unlisted_player",
+    "question": "How many points per game did Norman Powell average in his last five regular-season games?",
+    "kind": "named_average",
+    "expected_players": ["Norman Powell"]
+  },
+  {
+    "id": "two_player_comparison",
+    "question": "Compare Jaylen Brown and Devin Booker over their last five games.",
+    "kind": "named",
+    "expected_players": ["Jaylen Brown", "Devin Booker"]
+  },
+  {
+    "id": "surname_comparison",
+    "question": "Compare Tatum and Booker as recent scorers.",
+    "kind": "named",
+    "expected_players": ["Jayson Tatum", "Devin Booker"]
+  },
+  {
+    "id": "season_ppg_leader",
+    "question": "Who leads the NBA in points per game this season?",
+    "kind": "season_leader",
+    "expected_players": ["NBA scoring leaders"]
+  },
+  {
+    "id": "all_player_recent_rank",
+    "question": "Who scores the most points over their last five regular-season games?",
+    "kind": "recent_leader",
+    "expected_players": []
+  },
+  {
+    "id": "historical_player",
+    "question": "What did Michael Jordan average in his last five NBA regular-season games?",
+    "kind": "named",
+    "expected_players": ["Michael Jordan"]
+  },
+  {
+    "id": "unsupported_defense",
+    "question": "How does Jayson Tatum perform against zone defense?",
+    "kind": "unsupported",
+    "expected_players": []
+  },
+  {
+    "id": "unsupported_live",
+    "question": "How many points does Devin Booker have tonight?",
+    "kind": "unsupported",
+    "expected_players": []
+  }
+]

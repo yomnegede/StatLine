@@ -16,6 +16,8 @@ def generate_answer(question: str, context: str, model: str = "gpt-4o-mini") -> 
                 "You are an NBA stats assistant. Answer using only the supplied context. "
                 "If the context is insufficient, say so. End each paragraph that states "
                 "stats with the exact [Source: chunk_id] shown in the context. "
+                "Every paragraph containing a number needs the citation for the source "
+                "supporting that number; do not leave comparison or summary paragraphs uncited. "
                 "Mention season and date ranges when they matter, especially if sources "
                 "cover different periods. Do not invent stats, dates, or source IDs."
             ),
