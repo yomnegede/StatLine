@@ -225,6 +225,8 @@ def ask(request: AskRequest):
     cited_ids = re.findall(r"\[Source: ([^\]]+)\]", answer)
     if (uncited_stat_paragraphs(answer) or not cited_ids
             or any(cited_id not in {source.id for source in sources} for cited_id in cited_ids)):
-        answer = sourced_fallback(sources) or answer
+        answer = sourced_fallback(sources)
+        if not answer:
+            return AskResponse(answer=None, sources=sources, status="answer_unavailable", notice="A cited answer could not be generated from the retrieved stats.")
 
     return AskResponse(answer=answer, sources=sources, status="answered")
