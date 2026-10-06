@@ -42,6 +42,30 @@
     "expected_players": ["Michael Jordan"]
   },
   {
+    "id": "harden_back_to_backs_since_2014",
+    "question": "James Harden stats on back-to-backs starting from 2014",
+    "kind": "historical_b2b",
+    "expected_players": ["James Harden"]
+  },
+  {
+    "id": "curry_back_to_backs_since_2018",
+    "question": "Stephen Curry stats on back to backs since 2018",
+    "kind": "historical_b2b",
+    "expected_players": ["Stephen Curry"]
+  },
+  {
+    "id": "retired_player_back_to_backs",
+    "question": "Kobe Bryant back-to-back stats since 2014",
+    "kind": "historical_b2b",
+    "expected_players": ["Kobe Bryant"]
+  },
+  {
+    "id": "unlisted_player_back_to_backs",
+    "question": "Jalen Johnson back-to-back stats since 2024",
+    "kind": "historical_b2b",
+    "expected_players": ["Jalen Johnson"]
+  },
+  {
     "id": "unsupported_defense",
     "question": "How does Jayson Tatum perform against zone defense?",
     "kind": "unsupported",
