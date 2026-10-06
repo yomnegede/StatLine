@@ -1132,6 +1132,9 @@ main {
   line-height: 1.6;
   font-size: 11px;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
 }
 .evidence-body code {
   color: #9aa99e;

@@ -66,6 +66,17 @@ def grade(case: dict, result: dict, leader: str | None = None) -> dict[str, bool
         checks["names_scoring_leader"] = normalized(leader) in normalized(answer)
     if case["kind"] == "recent_leader" and sources:
         checks["names_recent_leader"] = normalized(sources[0]["player"]) in normalized(answer)
+    if case["kind"] == "historical_b2b" and sources:
+        source = sources[0]["content"]
+        totals = re.search(r"(\d+) qualifying games; totals: (\d+) PTS, (\d+) REB, (\d+) AST", source)
+        checks["states_calculated_average"] = bool(
+            totals and int(totals[1]) > 0
+            and all(f"{int(totals[index]) / int(totals[1]):.1f} {metric}" in answer
+                    for index, metric in ((2, "points"), (3, "rebounds"), (4, "assists")))
+        )
+        checks["lists_constituent_games"] = bool(
+            totals and source.count("(game ") == int(totals[1])
+        )
     return checks
 
 

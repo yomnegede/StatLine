@@ -24,6 +24,7 @@ The goal is not just to produce an answer. It is to show the evidence behind the
 - Natural-language NBA questions through `POST /ask`
 - Exact, on-demand retrieval for named players with available NBA regular-season game logs
 - Recent five-game player summaries with points, rebounds, assists, field-goal percentage, dates, and game-by-game results
+- Historical second-night back-to-back averages for any player in imported regular-season game logs, with the qualifying game IDs
 - Current-season scoring-leader recommendations
 - Player search and player profile views
 - Semantic retrieval over player summaries using Voyage AI embeddings and Supabase Postgres with pgvector
@@ -48,6 +49,8 @@ The home-page recommendations are a discovery list based on the latest available
 
 Recent player answers use the player's latest five games from the latest available season. Always check the dates and citations shown with an answer.
 
+Back-to-back answers use imported game facts from 2013-14 onward and explicitly state their season cutoff.
+
 ## Architecture
 
 ```mermaid
@@ -56,9 +59,11 @@ flowchart LR
     UI --> API[FastAPI API]
     API --> R[Question routing]
     R -->|Named player or supported ranking| NBA[NBA game logs and leaderboards]
+    R -->|Second-night back-to-back| H[(Private game facts and coverage)]
     R -->|General retrieval question| E[Voyage AI query embedding]
     E --> V[(Supabase Postgres + pgvector)]
     NBA --> S[Structured source summaries]
+    H --> UI
     V --> S
     S --> L[OpenAI answer generation]
     L --> C[Citation and answer-quality checks]
@@ -69,7 +74,7 @@ flowchart LR
 
 1. The frontend sends a question to the FastAPI `/ask` endpoint.
 2. The backend checks whether the question matches a supported direct-data path, such as a named-player lookup or scoring-leader query.
-3. If it does, StatLine fetches the relevant NBA data and builds source records directly from that data.
+3. Named-player and ranking routes fetch NBA data and build source records. The back-to-back route selects imported games and calculates the answer deterministically.
 4. Otherwise, the backend embeds the question with Voyage AI and retrieves the closest summaries from `public.nba_chunks` in Supabase.
 5. Retrieved sources are passed to OpenAI with instructions to cite them using source IDs.
 6. StatLine validates the generated answer. If citations are missing or unsupported statistical prose is detected, it falls back to a source-based response instead of returning an ungrounded answer.
@@ -221,6 +226,8 @@ Possible statuses:
 - `answer_unavailable` — sources were retrieved, but answer generation was unavailable
 - `no_data` — the question was unsupported or no relevant data was available
 
+Second-night back-to-back questions use imported game facts and answer without an OpenAI call. A bare year such as “since 2014” begins January 1, 2014; “since 2014-15” begins with that NBA season.
+
 ### `GET /health`
 
 Checks database connectivity and returns the number of stored semantic chunks.
@@ -280,9 +287,19 @@ The ingestion process:
 
 Because `nba_api` depends on NBA.com endpoints that can change or throttle requests, ingestion uses retries and a delay between players. Treat the data source as external and validate refresh results before relying on them in production.
 
+### Historical game facts
+
+Initialize the private `statline` schema and import regular-season team and player game logs:
+
+```bash
+venv/bin/python -m backend.history_import --init-schema --start-season 2013-14
+```
+
+The importer validates coverage and replaces each season in one transaction. Before the first completed game of a new season, it skips that empty season. Historical back-to-back answers reject gaps in older seasons. If only the current season is not yet imported, they answer through the latest contiguous loaded season and state that the current season is excluded. This route covers second nights of regular-season back-to-backs only.
+
 ## Evaluate answer quality
 
-StatLine includes a small, repeatable evaluation suite under [`evals/`](evals/). It covers player retrieval, comparisons, scoring-leader questions, historical players, citations, and unsupported live or defensive questions.
+StatLine includes a small, repeatable evaluation suite under [`evals/`](evals/). It covers player retrieval, comparisons, scoring-leader questions, historical back-to-back splits, citations, and unsupported live or defensive questions.
 
 Start the API, then run:
 
@@ -326,12 +343,16 @@ StatLine/
 │   ├── nba_data.py          # NBA data access and player snapshots
 │   ├── player_data.py       # Player response models
 │   ├── ingest.py            # NBA data ingestion and pgvector upserts
+│   ├── history.py           # Deterministic back-to-back query
+│   ├── history_import.py    # Historical game-fact import
 │   └── answer_quality.py    # Citation and fallback validation
 ├── frontend/
 │   ├── app/                 # Next.js routes and page entry points
 │   └── components/          # Reusable UI components
 ├── data/
 │   └── watchlist.json       # Optional manual ingestion list
+├── db/
+│   └── statline_history.sql # Private game-fact schema
 ├── docs/
 │   └── STAT_QUERY_ARCHITECTURE.md
 ├── evals/

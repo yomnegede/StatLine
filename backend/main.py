@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from utils.llm_client import generate_answer
 from utils.retrieval import select_named_sources
 from backend.player_data import PlayerSummary
+from backend.history import back_to_back_stats, is_back_to_back_question
 from backend.answer_quality import sourced_fallback, uncited_stat_paragraphs
 from backend.nba_data import PlayerOption, mentioned_players, player_snapshot, recommended_players, recommended_summaries, recent_leaders, search_players, season_data
 
@@ -188,6 +189,22 @@ def ask(request: AskRequest):
     question = request.question.strip()
     if len(question) < 3:
         raise HTTPException(status_code=422, detail="Enter a question of at least 3 characters")
+
+    if is_back_to_back_question(question):
+        try:
+            with closing(get_connection()) as connection:
+                result = back_to_back_stats(question, connection)
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Historical stats are unavailable") from error
+        if result is None or result.answer is None:
+            return AskResponse(answer=None, sources=[], status="no_data",
+                               notice=result.notice if result else "Historical stats are unavailable")
+        return AskResponse(
+            answer=result.answer,
+            sources=[Source(id=result.source_id, player=result.player,
+                            content=result.content, distance=0.0)],
+            status="answered",
+        )
 
     try:
         sources, notice = direct_sources(question)
